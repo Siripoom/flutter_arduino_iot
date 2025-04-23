@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/mqtt_provider.dart';
 import 'control_devices_screen.dart';
 import 'notification_screen.dart';
 
@@ -8,113 +10,148 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  double temperature = 25.0;
-  double humidity = 60.0;
-  bool isConnected = true;
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Color(0xFFF5F7FA),
-      appBar: AppBar(
-        title: Text(
-          'Dashboard',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Colors.blue.shade700,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.notifications),
+    // ใช้ Consumer เพื่อฟังการเปลี่ยนแปลงข้อมูลจาก Provider
+    return Consumer<MQTTProvider>(
+      builder: (context, mqttProvider, child) {
+        return Scaffold(
+          backgroundColor: Color(0xFFF5F7FA),
+          appBar: AppBar(
+            title: Text(
+              'Dashboard',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            backgroundColor: Colors.blue.shade700,
+            elevation: 0,
+            actions: [
+              IconButton(
+                icon: Icon(Icons.notifications),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => NotificationScreen()),
+                  );
+                },
+              ),
+              IconButton(
+                icon: Icon(Icons.settings),
+                onPressed: () {
+                  // Show settings dialog
+                },
+              ),
+            ],
+          ),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildConnectionStatus(mqttProvider.isConnected),
+                  SizedBox(height: 24),
+                  Text(
+                    'ข้อมูลเซ็นเซอร์',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildSensorCard(
+                          icon: Icons.thermostat,
+                          title: 'อุณหภูมิ',
+                          value:
+                              '${mqttProvider.temperature.toStringAsFixed(1)}°C',
+                          color: Colors.orange,
+                          trend: 'ค่าล่าสุด',
+                          trendUp: mqttProvider.temperature > 30,
+                        ),
+                      ),
+                      SizedBox(width: 16),
+                      Expanded(
+                        child: _buildSensorCard(
+                          icon: Icons.water_drop,
+                          title: 'ความชื้น',
+                          value: '${mqttProvider.humidity.toStringAsFixed(1)}%',
+                          color: Colors.blue,
+                          trend: 'ค่าล่าสุด',
+                          trendUp: mqttProvider.humidity > 60,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildSensorCard(
+                          icon: Icons.light_mode,
+                          title: 'แสง',
+                          value: '${mqttProvider.light} lux',
+                          color: Colors.amber,
+                          trend: mqttProvider.light < 300
+                              ? 'ต่ำกว่าเกณฑ์'
+                              : 'ปกติ',
+                          trendUp: mqttProvider.light >= 300,
+                        ),
+                      ),
+                      SizedBox(width: 16),
+                      Expanded(
+                        child: _buildSensorCard(
+                          icon: Icons.radar,
+                          title: 'ระยะห่าง',
+                          value: '${mqttProvider.distance} cm',
+                          color: Colors.green,
+                          trend:
+                              mqttProvider.distance < 30 ? 'ระวัง' : 'ปลอดภัย',
+                          trendUp: mqttProvider.distance >= 30,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 24),
+                  Text(
+                    'ควบคุมอุปกรณ์',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  _buildDeviceControlCard(mqttProvider),
+                  SizedBox(height: 16),
+                  _buildGyroAccelCard(mqttProvider),
+                  SizedBox(height: 16),
+                  if (mqttProvider.gpsCoordinates.isNotEmpty)
+                    _buildLocationCard(mqttProvider.gpsCoordinates),
+                ],
+              ),
+            ),
+          ),
+          floatingActionButton: FloatingActionButton.extended(
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => NotificationScreen()),
+                MaterialPageRoute(builder: (context) => ControlDevicesScreen()),
               );
             },
+            backgroundColor: Colors.blue.shade700,
+            label: Text('ควบคุมอุปกรณ์เพิ่มเติม'),
+            icon: Icon(Icons.settings_remote),
           ),
-          IconButton(
-            icon: Icon(Icons.settings),
-            onPressed: () {
-              // Show settings dialog
-            },
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildConnectionStatus(),
-              SizedBox(height: 24),
-              Text(
-                'ข้อมูลเซ็นเซอร์',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildSensorCard(
-                      icon: Icons.thermostat,
-                      title: 'อุณหภูมิ',
-                      value: '$temperature°C',
-                      color: Colors.orange,
-                      trend: 'เพิ่มขึ้น +0.5°C',
-                      trendUp: true,
-                    ),
-                  ),
-                  SizedBox(width: 16),
-                  Expanded(
-                    child: _buildSensorCard(
-                      icon: Icons.water_drop,
-                      title: 'ความชื้น',
-                      value: '$humidity%',
-                      color: Colors.blue,
-                      trend: 'ลดลง -2%',
-                      trendUp: false,
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 24),
-              Text(
-                'ควบคุมอุปกรณ์',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              SizedBox(height: 16),
-              _buildDeviceControlCard(),
-              SizedBox(height: 16),
-              _buildDeviceHistoryCard(),
-            ],
-          ),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => ControlDevicesScreen()),
-          );
-        },
-        backgroundColor: Colors.blue.shade700,
-        label: Text('ควบคุมอุปกรณ์เพิ่มเติม'),
-        icon: Icon(Icons.settings_remote),
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildConnectionStatus() {
+  Widget _buildConnectionStatus(bool isConnected) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -135,7 +172,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Expanded(
             child: Text(
               isConnected
-                  ? 'เชื่อมต่อกับอุปกรณ์ Arduino สำเร็จแล้ว'
+                  ? 'เชื่อมต่อกับอุปกรณ์ Smart Cane สำเร็จแล้ว'
                   : 'ไม่สามารถเชื่อมต่อกับอุปกรณ์ได้',
               style: TextStyle(
                 color:
@@ -149,6 +186,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               : TextButton(
                   onPressed: () {
                     // Try to reconnect
+                    final mqttProvider =
+                        Provider.of<MQTTProvider>(context, listen: false);
+                    mqttProvider.connect();
                   },
                   child: Text('เชื่อมต่อใหม่'),
                   style: TextButton.styleFrom(
@@ -222,14 +262,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               Icon(
                 trendUp ? Icons.arrow_upward : Icons.arrow_downward,
-                color: trendUp ? Colors.red : Colors.green,
+                color: trendUp ? Colors.green : Colors.red,
                 size: 16,
               ),
               SizedBox(width: 4),
               Text(
                 trend,
                 style: TextStyle(
-                  color: trendUp ? Colors.red : Colors.green,
+                  color: trendUp ? Colors.green : Colors.red,
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                 ),
@@ -241,7 +281,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildDeviceControlCard() {
+  Widget _buildDeviceControlCard(MQTTProvider mqttProvider) {
     return Container(
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -283,9 +323,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
               Switch(
-                value: true,
+                value: mqttProvider.ledStatus,
                 onChanged: (value) {
-                  // ส่งคำสั่งเปิด/ปิด LED
+                  mqttProvider.toggleLED(value);
                 },
                 activeColor: Colors.green,
               ),
@@ -301,7 +341,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  Icons.air,
+                  Icons.notifications_active,
                   color: Colors.blue,
                   size: 20,
                 ),
@@ -309,7 +349,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'พัดลม',
+                  'เสียงเตือน',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -318,9 +358,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
               Switch(
-                value: false,
+                value: mqttProvider.buzzerStatus,
                 onChanged: (value) {
-                  // ส่งคำสั่งเปิด/ปิดพัดลม
+                  mqttProvider.toggleBuzzer(value);
                 },
                 activeColor: Colors.green,
               ),
@@ -331,7 +371,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildDeviceHistoryCard() {
+  Widget _buildGyroAccelCard(MQTTProvider mqttProvider) {
     return Container(
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -349,7 +389,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'ประวัติการทำงานล่าสุด',
+            'การเคลื่อนไหว',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -357,69 +397,166 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           SizedBox(height: 16),
-          _buildHistoryItem(
-            icon: Icons.lightbulb,
-            title: 'LED หลัก เปิด',
-            time: '15:30',
-            color: Colors.amber,
-          ),
-          Divider(),
-          _buildHistoryItem(
-            icon: Icons.air,
-            title: 'พัดลม ปิด',
-            time: '15:20',
-            color: Colors.blue,
-          ),
-          Divider(),
-          _buildHistoryItem(
-            icon: Icons.thermostat,
-            title: 'อุณหภูมิเกินกำหนด',
-            time: '14:45',
-            color: Colors.red,
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.rotate_right,
+                          color: Colors.purple,
+                          size: 16,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          'Gyroscope',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.black54,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      '${mqttProvider.gyro.toStringAsFixed(2)} °/s',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.speed,
+                          color: Colors.orange,
+                          size: 16,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          'Accelerometer',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.black54,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      '${mqttProvider.accel.toStringAsFixed(2)} m/s²',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildHistoryItem({
-    required IconData icon,
-    required String title,
-    required String time,
-    required Color color,
-  }) {
-    return Row(
-      children: [
-        Container(
-          padding: EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            shape: BoxShape.circle,
+  Widget _buildLocationCard(String coordinates) {
+    final parts = coordinates.split(',');
+    String lat = parts.isNotEmpty ? parts[0] : '0.0';
+    String lng = parts.length > 1 ? parts[1] : '0.0';
+
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: Offset(0, 5),
           ),
-          child: Icon(
-            icon,
-            color: color,
-            size: 16,
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.location_on,
+                  color: Colors.red,
+                  size: 20,
+                ),
+              ),
+              SizedBox(width: 12),
+              Text(
+                'ตำแหน่งปัจจุบัน',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
           ),
-        ),
-        SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            title,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.black87,
+          SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Latitude: $lat',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  'Longitude: $lng',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: () {
+              // Open map with coordinates
+              // Launch URL: 'https://maps.google.com/maps/place/$lat,$lng'
+            },
+            icon: Icon(Icons.map),
+            label: Text('ดูบนแผนที่'),
+            style: ElevatedButton.styleFrom(
+              foregroundColor: Colors.white,
+              backgroundColor: Colors.red.shade700,
+              minimumSize: Size(double.infinity, 40),
             ),
           ),
-        ),
-        Text(
-          time,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.black54,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
